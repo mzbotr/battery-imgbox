@@ -2,10 +2,10 @@ local awful=require("awful")
 local wibox=require("wibox")
 local naughty=require("naughty")
 local battery={}
+local adapter="BAT0" --<-- battery directory here.
 battery.imgbx=wibox.widget.imagebox()
 battery.txtbx=wibox.widget.textbox()
 battery.limits={ {25,5},{12,3},{7,1},{0} }
-
 -- Picutres discharging
 battery_full=(awful.util.getdir("config").."/config/battery_full.png")
 battery_thre=(awful.util.getdir("config").."/config/battery_thre.png")
@@ -28,8 +28,9 @@ battery.images={
 	{ac}}
 
 function battery.get_battery(adapter)
-	assert((tonumber(adapter))==nil)
-	local fcur=assert(io.open("/sys/class/power_supply/"..adapter.."/energy_now","r"),"test")
+	assert((tonumber(adapter))==nil) -- Only strings allowed
+	-- Throw an error if adapter is not there.
+	local fcur=assert(io.open("/sys/class/power_supply/"..adapter.."/energy_now","r"),nil)
 	local fcap=assert(io.open("/sys/class/power_supply/"..adapter.."/energy_full","r"),nil)
 	local fsta=assert(io.open("/sys/class/power_supply/"..adapter.."/status","r"),nil)
 	local cur=fcur:read()
@@ -50,12 +51,12 @@ function battery.get_battery(adapter)
 			end
 		end
 	end
-end 
+end
+
 function battery.iterate_lims ()
 	for indx,pair in pairs(battery.limits) do
 		lim=pair[1]; step=pair[2]
 		battery.cursor=battery.limits[indx+1][1] or 0
-	--	print(nextlim)
 		if battery.state>battery.cursor then
 			repeat
 			 lim=lim-step
@@ -68,34 +69,37 @@ function battery.iterate_lims ()
 	end
 end
 
--- battery.cursror as nextlim for future
 function battery.callback(adapter)
 	battery.cursor=battery.limits[1][1]
---	return function ()
+	-- Protected execution for get_battery under anonymous function call.
+	-- If get_battery enters an error state (numeric input or disconnected
+	-- battery), default to A/C condition.
 	if pcall(function() battery.get_battery(adapter) end) then
 		if battery.state <= battery.cursor then
 			if battery.dindex==2
-			  then print("bad shit")
+			  then print("bad shit pops up here")
 			end
 			battery.cursor=battery.iterate_lims()
 		end
-		battery.txtbx:set_text(battery.state.."%")
+		battery.txtbx:set_text("| | "..battery.state.."%") 
 		for indx,val in pairs(battery.limits) do
 		  if battery.cursor==val[1] then
 			battery.imgbx:set_image(battery.images[indx][battery.dindex])
 		  end
 		end
 	else
+		-- Adapter is no longer present at the expected directory.
+		-- Default case for AC power and no battery.
+		-- -- TODO: Set fields to nil here for wibox widgets (progress bars, timers)
+		-- -- when relevant.
 		battery.txtbox:set_text("A/C")
 		battery.imgbox:set_image(battery.images[5][1])
 	end
 end
-battery.callback("BAT0")
+battery.callback(adapter)
 battery_time=timer({timeout=5})
-battery_time:connect_signal("timeout", function () battery.callback("BAT0") end)
+battery_time:connect_signal("timeout", function () battery.callback(adapter) end)
 battery_time:start()
--- Mouseovers are only good for useless shit like direction
--- replace this shit V with a systray on wibox in rc.lua
 battery.imgbx:connect_signal(
 	"mouse::enter",function() naughty.notify({
 						text=battery.direction,
