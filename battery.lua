@@ -74,7 +74,9 @@ function battery.callback(adapter)
 --	return function ()
 	if pcall(function() battery.get_battery(adapter) end) then
 		if battery.state <= battery.cursor then
-			print("bad shit")
+			if battery.dindex==2
+			  then print("bad shit")
+			end
 			battery.cursor=battery.iterate_lims()
 		end
 		battery.txtbx:set_text(battery.state.."%")
