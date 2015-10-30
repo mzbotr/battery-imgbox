@@ -5,7 +5,8 @@ local battery={}
 local adapter="BAT0" --<-- battery directory here.
 battery.imgbx=wibox.widget.imagebox()
 battery.txtbx=wibox.widget.textbox()
-battery.limits={ {25,5},{12,3},{7,1},{0} }
+battery.limits={ {75,38},{54,14},{32,7},{0} }
+
 -- Picutres discharging
 battery_full=(awful.util.getdir("config").."/config/battery_full.png")
 battery_thre=(awful.util.getdir("config").."/config/battery_thre.png")
@@ -55,8 +56,7 @@ end
 
 function battery.iterate_lims ()
 	for indx,pair in pairs(battery.limits) do
-		lim=pair[1]; step=pair[2]
-		battery.cursor=battery.limits[indx+1][1] or 0
+		lim=pair[1]; step=pair[2]; battery.cursor=battery.limits[indx+1][1] or 0
 		if battery.state>battery.cursor then
 			repeat
 			 lim=lim-step
@@ -70,21 +70,18 @@ function battery.iterate_lims ()
 end
 
 function battery.callback(adapter)
-	battery.cursor=battery.limits[1][1]
 	-- Protected execution for get_battery under anonymous function call.
 	-- If get_battery enters an error state (numeric input or disconnected
 	-- battery), default to A/C condition.
 	if pcall(function() battery.get_battery(adapter) end) then
 		if battery.state <= battery.cursor then
-			if battery.dindex==2
-			  then print("bad shit pops up here")
-			end
 			battery.cursor=battery.iterate_lims()
 		end
-		battery.txtbx:set_text("| | "..battery.state.."%") 
+		battery.txtbx:set_text("| | "..battery.state.."%")
 		for indx,val in pairs(battery.limits) do
-		  if battery.cursor==val[1] then
+		  if battery.state>val[1] then
 			battery.imgbx:set_image(battery.images[indx][battery.dindex])
+			break
 		  end
 		end
 	else
@@ -96,13 +93,15 @@ function battery.callback(adapter)
 		battery.imgbox:set_image(battery.images[5][1])
 	end
 end
+
+battery.cursor=battery.limits[1][1]
 battery.callback(adapter)
-battery_time=timer({timeout=5})
+battery_time=timer({timeout=1})
 battery_time:connect_signal("timeout", function () battery.callback(adapter) end)
 battery_time:start()
 battery.imgbx:connect_signal(
 	"mouse::enter",function() naughty.notify({
-						text=battery.direction,
+						text=battery.cursor,
 						timeout=1,
 						hover_timeout=30,
 						position="top_right"}) end)
